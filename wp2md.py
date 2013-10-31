@@ -11,6 +11,7 @@ import re
 import sys
 import time
 import traceback
+import urllib 
 from xml.etree.ElementTree import XMLParser
 
 sys.path.insert(0, 'lib')
@@ -25,6 +26,7 @@ __version__ = '.'.join(map(str, __version_info__))
 __status__ = 'Development'
 __url__ = 'https://github.com/dreikanter/wp2md'
 
+# sudo rm -r ~/tmp/blog && sudo  python wp2md.py -d ~/tmp/blog /Users/conis/Downloads/wordpress.2013-04-16.xml
 # XML elements to save (starred ones are additional fields
 # generated during export data processing)
 WHAT2SAVE = {
@@ -44,18 +46,18 @@ WHAT2SAVE = {
     'item': [
         'title',
         'link',
-        'creator',
-        'description',
+        #'creator',
+        #'description',
         'post_id',
         'post_date',
-        'post_date_gmt',
-        'comment_status',
-        'post_name',
-        'status',
+        #'post_date_gmt',
+        #'comment_status',
+        #'post_name',
+        #'status',
         'post_type',
         'excerpt',
         'content',              # Generated: item content
-        'comments',             # Generated: comments lis
+        #'comments',             # Generated: comments lis
         # 'guid',
         # 'is_sticky',
         # 'menu_order',
@@ -309,12 +311,16 @@ def get_path(item_type, file_name=None, data=None):
         relpath = file_name
     else:
         name = data.get('post_name', '').strip()
+        name = urllib.unquote(name)
         name = name or data.get('post_id', UNTITLED)
-        relpath = get_path_fmt(item_type, data)
-        relpath = relpath.format(year=str(data['post_date'][0]),
-                                 month=str(data['post_date'][1]),
-                                 date=str(data['post_date'][2]),
-                                 name=name)
+
+
+        #relpath = get_path_fmt(item_type, data)
+        #relpath = relpath.format(year=str(data['post_date'][0]),
+        #                        month=str(data['post_date'][1]),
+        #                         date=str(data['post_date'][2]),
+        #                         name=name)
+        relpath = "%s.md" % data['post_id']
 
     return uniquify(os.path.join(os.path.abspath(root), relpath))
 
@@ -458,8 +464,11 @@ def dump_item(data):
 
     fields = WHAT2SAVE['item']
     pdata = {}
+
+
     for field in fields:
         pdata[field] = data.get(field, '')
+
 
     # Post date
     format = conf['date_fmt']
@@ -497,7 +506,19 @@ def dump(file_name, data, order):
                         value = time.strftime(conf['date_fmt'], data[field])
                     else:
                         value = data[field] or ''
-                    f.write(u"%s: %s\n" % (unicode(field), unicode(value)))
+
+                    field = unicode(field)
+                    fieldName = {
+                      'title': 'Title',
+                      'link': 'Link',
+                      'post_id': 'ID',
+                      'post_date': 'Date',
+                      'post_type': 'Type'
+                    }
+
+                    #print field
+
+                    f.write(u"%s: %s\n" % (fieldName[field], unicode(value)))
 
             if extras:
                 excerpt = extras.get('excerpt', '')
@@ -569,10 +590,13 @@ class CustomParser:
             self.cmnt = None
 
         elif tag == 'item' and self.cur_section() == 'item':
-            self.end_section()
-            dump_item(self.item)
-            self.store_item_info()
-            self.item = None
+            try:
+                self.end_section()
+                dump_item(self.item)
+                self.store_item_info()
+                self.item = None
+            except:
+                print "Error on '%s'" % self.item.get('post_name')
 
         elif tag == 'channel':
             self.end_section()
@@ -630,10 +654,13 @@ def main():
     init()
     log.info("Parsing '%s'..." % os.path.basename(conf['source_file']))
 
-    stopwatch_set()
-    target = CustomParser()
-    parser = XMLParser(target=target)
-    parser.feed(open(conf['source_file']).read())
+    try:
+        stopwatch_set()
+        target = CustomParser()
+        parser = XMLParser(target=target)
+        parser.feed(open(conf['source_file']).read())
+    except:
+        print "Error"
 
     log.info('')
     totals = 'Total: posts: {post}; pages: {page}; comments: {comment}'
