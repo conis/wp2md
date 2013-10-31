@@ -26,7 +26,8 @@ __version__ = '.'.join(map(str, __version_info__))
 __status__ = 'Development'
 __url__ = 'https://github.com/dreikanter/wp2md'
 
-# sudo rm -r ~/tmp/blog && sudo  python wp2md.py -d ~/tmp/blog /Users/conis/Downloads/wordpress.2013-04-16.xml
+#sudo rm -r blog && sudo python wp2md.py -d blog wordpress.xml
+
 # XML elements to save (starred ones are additional fields
 # generated during export data processing)
 WHAT2SAVE = {
@@ -45,7 +46,7 @@ WHAT2SAVE = {
     ],
     'item': [
         'title',
-        'link',
+        #'link',
         #'creator',
         #'description',
         'post_id',
@@ -53,7 +54,7 @@ WHAT2SAVE = {
         #'post_date_gmt',
         #'comment_status',
         #'post_name',
-        #'status',
+        'status',
         'post_type',
         'excerpt',
         'content',              # Generated: item content
@@ -320,7 +321,7 @@ def get_path(item_type, file_name=None, data=None):
         #                        month=str(data['post_date'][1]),
         #                         date=str(data['post_date'][2]),
         #                         name=name)
-        relpath = "%s.md" % data['post_id']
+        relpath = "%s_%s.md" % (data['post_id'], data['title'])
 
     return uniquify(os.path.join(os.path.abspath(root), relpath))
 
@@ -497,6 +498,7 @@ def dump(file_name, data, order):
 
         with codecs.open(file_name, 'w', 'utf-8') as f:
             extras = {}
+            f.write("<!--\n");
             for field in filter(lambda x: x in data, [item for item in order]):
                 if field in ['content', 'comments', 'excerpt']:
                     # Fields for non-standard processing
@@ -513,16 +515,22 @@ def dump(file_name, data, order):
                       'link': 'Link',
                       'post_id': 'ID',
                       'post_date': 'Date',
-                      'post_type': 'Type'
+                      'post_type': 'Type',
+                      'status': 'Status'
                     }
 
                     #print field
 
                     f.write(u"%s: %s\n" % (fieldName[field], unicode(value)))
 
+            excerpt = extras.get('excerpt', '');
+            excerpt = excerpt.replace('\n', '</br>')
+            f.write(u"%s: %s\n" % ('Excerpt', excerpt))
+            f.write("-->\n");
+
             if extras:
-                excerpt = extras.get('excerpt', '')
-                excerpt = excerpt and '<!--%s-->' % excerpt
+                #excerpt = extras.get('excerpt', '')
+                #excerpt = excerpt and '%s' % excerpt
 
                 content = extras.get('content', '')
                 if conf['md_input']:
@@ -534,11 +542,11 @@ def dump(file_name, data, order):
                 if conf['fix_urls']:
                     content = fix_urls(html2md(content))
 
-                if 'title' in data:
-                    content = u"# %s\n\n%s" % (data['title'], content)
+                #if 'title' in data:
+                #    content = u"# %s\n\n%s" % (data['title'], content)
 
-                comments = generate_comments(extras.get('comments', []))
-                extras = filter(None, [excerpt, content, comments])
+                #comments = generate_comments(extras.get('comments', []))
+                extras = filter(None, [content])
                 f.write('\n' + '\n\n'.join(extras))
 
     except Exception as e:
@@ -659,8 +667,9 @@ def main():
         target = CustomParser()
         parser = XMLParser(target=target)
         parser.feed(open(conf['source_file']).read())
-    except:
-        print "Error"
+    except Exception as e:
+        log.error("Error %s", str(e))
+        log.debug(e)
 
     log.info('')
     totals = 'Total: posts: {post}; pages: {page}; comments: {comment}'
